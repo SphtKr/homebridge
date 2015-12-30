@@ -1,8 +1,9 @@
-var types = require("hap-nodejs/accessories/types.js");
+var debug = require('debug')('LiftMaster');
+var Service = require("HAP-NodeJS").Service;
+var Characteristic = require("HAP-NodeJS").Characteristic;
+var types = require("HAP-NodeJS/accessories/types.js");
 var request = require("request");
-
-// This seems to be the "id" of the official LiftMaster iOS app
-var APP_ID = "JVM/G9Nwih5BwKgNCjLxiFUQxQijAebyyg8QUHr7JOrP+tuPb8iHfRHKwTmDzHOu"
+var Q = require("q");
 
 function LiftMasterAccessory(log, config) {
   this.log = log;
@@ -10,6 +11,8 @@ function LiftMasterAccessory(log, config) {
   this.username = config["username"];
   this.password = config["password"];
   this.requiredDeviceId = config["requiredDeviceId"];
+  this.base_url = config["base_url"] || "https://myqexternal.myqdevice.com/api/";
+  this.app_id = config["app_id"] || "JVM/G9Nwih5BwKgNCjLxiFUQxQijAebyyg8QUHr7JOrP+tuPb8iHfRHKwTmDzHOu";
 }
 
 LiftMasterAccessory.prototype = {
@@ -27,7 +30,7 @@ LiftMasterAccessory.prototype = {
 
     // querystring params
     var query = {
-      appId: APP_ID,
+      appId: this.app_id,
       username: this.username,
       password: this.password,
       culture: "en"
@@ -35,7 +38,7 @@ LiftMasterAccessory.prototype = {
 
     // login to liftmaster
     request.get({
-      url: "https://myqexternal.myqdevice.com/api/user/validatewithculture",
+      url: this.base_url + "user/validatewithculture",
       qs: query
     }, function(err, response, body) {
 
@@ -60,20 +63,20 @@ LiftMasterAccessory.prototype = {
 
     // querystring params
     var query = {
-      appId: APP_ID,
+      appId: this.app_id,
       SecurityToken: this.securityToken,
       filterOn: "true"
     };
 
     // some necessary duplicated info in the headers
     var headers = {
-      MyQApplicationId: APP_ID,
+      MyQApplicationId: this.app_id,
       SecurityToken: this.securityToken
     };
 
     // request details of all your devices
     request.get({
-      url: "https://myqexternal.myqdevice.com/api/v4/userdevicedetails/get",
+      url: this.base_url + "v4/userdevicedetails/get",
       qs: query,
       headers: headers
     }, function(err, response, body) {
@@ -146,21 +149,21 @@ LiftMasterAccessory.prototype = {
     });
   },
 
-  setTargetState: function() {
+  setTargetState: function(targetState) {
 
     var that = this;
-    var liftmasterState = (this.targetState + "") == "1" ? "0" : "1";
+    var liftmasterState = targetState == TargetDoorState.CLOSED ? "0" : "1";
 
     // querystring params
     var query = {
-      appId: APP_ID,
+      appId: this.app_id,
       SecurityToken: this.securityToken,
       filterOn: "true"
     };
 
     // some necessary duplicated info in the headers
     var headers = {
-      MyQApplicationId: APP_ID,
+      MyQApplicationId: this.app_id,
       SecurityToken: this.securityToken
     };
 
@@ -168,14 +171,14 @@ LiftMasterAccessory.prototype = {
     var body = {
       AttributeName: "desireddoorstate",
       AttributeValue: liftmasterState,
-      ApplicationId: APP_ID,
+      ApplicationId: this.app_id,
       SecurityToken: this.securityToken,
       MyQDeviceId: this.deviceId
     };
 
     // send the state request to liftmaster
     request.put({
-      url: "https://myqexternal.myqdevice.com/api/v4/DeviceAttribute/PutDeviceAttribute",
+      url: this.base_url + "v4/DeviceAttribute/PutDeviceAttribute",
       qs: query,
       headers: headers,
       body: body,
